@@ -2,8 +2,9 @@ import os
 import json
 import logging
 import requests
-from flask import Flask
-from threading import Thread
+import http.server
+import socketserver
+import threading
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
@@ -14,7 +15,6 @@ DEVELOPER_ID = 7958260008
 
 USER_FILE = "users.json"
 logging.basicConfig(level=logging.INFO)
-app = Flask(__name__)
 
 # ========== إدارة المستخدمين ==========
 def load_users():
@@ -251,17 +251,22 @@ def run_bot():
     application.run_polling()
 
 # ========== خادم ويب بسيط (لإبقاء Render نشطاً) ==========
-@app.route('/')
-def home():
-    return "Bot is running!"
+class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
 
-def run_flask():
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    with socketserver.TCPServer(("0.0.0.0", port), HealthCheckHandler) as httpd:
+        print(f"🟢 خادم الويب يعمل على المنفذ {port}")
+        httpd.serve_forever()
 
 if __name__ == "__main__":
     # تشغيل البوت في خيط منفصل
-    bot_thread = Thread(target=run_bot)
+    bot_thread = threading.Thread(target=run_bot)
     bot_thread.daemon = True
     bot_thread.start()
-    # تشغيل خادم Flask
-    run_flask()
+    # تشغيل خادم الويب (سيستمر حتى يتم إيقافه)
+    run_web_server()
