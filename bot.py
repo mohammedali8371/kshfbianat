@@ -247,10 +247,10 @@ def run_bot():
     application.add_handler(CommandHandler("admin", admin_panel))
     application.add_handler(CallbackQueryHandler(callback_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🤖 البوت يعمل...")
+    print("✅ BOT STARTED SUCCESSFULLY (OSINT YEMEN V2)")
     application.run_polling()
 
-# ========== خادم ويب بسيط (لإبقاء Render نشطاً) ==========
+# ========== خادم ويب بسيط ==========
 class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -260,13 +260,12 @@ class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     with socketserver.TCPServer(("0.0.0.0", port), HealthCheckHandler) as httpd:
-        print(f"🟢 خادم الويب يعمل على المنفذ {port}")
+        print(f"✅ WEB SERVER RUNNING ON PORT {port}")
         httpd.serve_forever()
 
 if __name__ == "__main__":
-    # تشغيل البوت في خيط منفصل
+    print("🚀 STARTING OSINT BOT V2 (RENDER COMPATIBLE)...")
     bot_thread = threading.Thread(target=run_bot)
     bot_thread.daemon = True
     bot_thread.start()
-    # تشغيل خادم الويب (سيستمر حتى يتم إيقافه)
     run_web_server()
