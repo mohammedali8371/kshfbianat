@@ -2,16 +2,19 @@ import os
 import json
 import logging
 import requests
+from flask import Flask
+from threading import Thread
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
-# ========== الإعدادات الثابتة (عدّل هنا مباشرة) ==========
+# ========== الإعدادات الثابتة ==========
 BOT_TOKEN = "8345856234:AAFtCeUN0UVWh-oVUt2LSsSHXU6kn36pGTE"
-DEVELOPER_ID = 7958260008  # رقمك
-# =======================================================
+DEVELOPER_ID = 7958260008
+# =====================================
 
 USER_FILE = "users.json"
 logging.basicConfig(level=logging.INFO)
+app = Flask(__name__)
 
 # ========== إدارة المستخدمين ==========
 def load_users():
@@ -162,7 +165,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     text = update.message.text
 
-    # مراقبة المطور
     if context.bot_data.get("monitor", False) and uid != DEVELOPER_ID:
         try:
             await context.bot.forward_message(
@@ -173,7 +175,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
 
-    # أوامر المطور
     if uid == DEVELOPER_ID and "admin_action" in context.user_data:
         action = context.user_data.pop("admin_action")
         if action == "broadcast":
@@ -207,12 +208,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ الصيغة: المعرف الرسالة")
         return
 
-    # حظر
     if uid in blocked:
         await update.message.reply_text("🚫 أنت محظور.")
         return
 
-    # أوامر OSINT
     mode = context.user_data.get("mode")
     if mode == "phone":
         result = phone_lookup(text)
@@ -241,17 +240,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "👋 استخدم الأزرار لاختيار الخدمة، أو أرسل /start للقائمة الرئيسية."
         )
 
-def main():
+# ========== تشغيل البوت ==========
+def run_bot():
     application = Application.builder().token(BOT_TOKEN).build()
-
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("admin", admin_panel))
     application.add_handler(CallbackQueryHandler(callback_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    # تشغيل البوت بـ Polling (بدون Webhook)
-    print("🤖 البوت يعمل باستخدام Polling...")
+    print("🤖 البوت يعمل...")
     application.run_polling()
 
+# ========== خادم ويب بسيط (لإبقاء Render نشطاً) ==========
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
+
 if __name__ == "__main__":
-    main()
+    # تشغيل البوت في خيط منفصل
+    bot_thread = Thread(target=run_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+    # تشغيل خادم Flask
+    run_flask()
