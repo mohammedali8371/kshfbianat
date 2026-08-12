@@ -4,18 +4,11 @@ import logging
 import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
-from dotenv import load_dotenv
 
-# تحميل المتغيرات البيئية
-load_dotenv()
-
-# ========== الإعدادات الأساسية ==========
-TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-DEVELOPER_ID = int(os.getenv("DEVELOPER_ID", "0"))
-
-if not TOKEN or not WEBHOOK_URL or DEVELOPER_ID == 0:
-    raise ValueError("❌ يرجى تعيين BOT_TOKEN و WEBHOOK_URL و DEVELOPER_ID في متغيرات البيئة")
+# ========== الإعدادات الثابتة (عدّل هنا مباشرة) ==========
+BOT_TOKEN = "8345856234:AAFtCeUN0UVWh-oVUt2LSsSHXU6kn36pGTE"
+DEVELOPER_ID = 7958260008  # رقمك
+# =======================================================
 
 USER_FILE = "users.json"
 logging.basicConfig(level=logging.INFO)
@@ -34,11 +27,8 @@ def save_users(users):
 users = load_users()
 blocked = set()
 
-# ========== دوال OSINT الأساسية ==========
+# ========== دوال OSINT ==========
 def phone_lookup(phone):
-    """
-    بحث عن رقم هاتف باستخدام API مجاني (Veriphone)
-    """
     try:
         url = f"https://api.veriphone.io/v2/verify?phone={phone}&key=DEMO&default_country=YE"
         response = requests.get(url, timeout=10)
@@ -57,9 +47,6 @@ def phone_lookup(phone):
         return {"error": f"خطأ في الاتصال: {e}"}
 
 def username_search(username):
-    """
-    البحث عن اسم مستخدم عبر منصات التواصل (باستخدام Sherlock API)
-    """
     try:
         url = f"https://api.sherlock.project/api/v1/search?username={username}"
         response = requests.get(url, timeout=15)
@@ -69,7 +56,7 @@ def username_search(username):
             if info.get("exists"):
                 results.append(f"✅ {site}: {info.get('url')}")
         if results:
-            return "\n".join(results[:10])  # عرض أول 10 نتائج
+            return "\n".join(results[:10])
         else:
             return "❌ لم يتم العثور على حسابات بهذا الاسم"
     except Exception as e:
@@ -225,11 +212,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🚫 أنت محظور.")
         return
 
-    # ===== أوامر OSINT =====
+    # أوامر OSINT
     mode = context.user_data.get("mode")
-
     if mode == "phone":
-        # بحث برقم هاتف
         result = phone_lookup(text)
         if result.get("error"):
             await update.message.reply_text(f"❌ {result['error']}")
@@ -246,35 +231,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("mode", None)
 
     elif mode == "username":
-        # بحث باسم مستخدم
         await update.message.reply_text("⏳ جاري البحث ...")
         result = username_search(text)
         await update.message.reply_text(f"🔍 **نتائج البحث عن `{text}`:**\n\n{result}", parse_mode="Markdown")
         context.user_data.pop("mode", None)
 
     else:
-        # رسالة عادية
         await update.message.reply_text(
             "👋 استخدم الأزرار لاختيار الخدمة، أو أرسل /start للقائمة الرئيسية."
         )
 
 def main():
-    application = Application.builder().token(TOKEN).build()
+    application = Application.builder().token(BOT_TOKEN).build()
 
-    # إضافة المعالجات
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("admin", admin_panel))
     application.add_handler(CallbackQueryHandler(callback_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # تشغيل البوت عبر Webhook
-    port = int(os.environ.get("PORT", 10000))
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=port,
-        url_path=TOKEN,
-        webhook_url=f"{WEBHOOK_URL}/{TOKEN}"
-    )
+    # تشغيل البوت بـ Polling (بدون Webhook)
+    print("🤖 البوت يعمل باستخدام Polling...")
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
